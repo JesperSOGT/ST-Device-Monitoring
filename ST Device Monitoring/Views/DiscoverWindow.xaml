@@ -1,0 +1,112 @@
+<Window x:Class="ST_Device_Monitoring.Views.DiscoverWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Discover devices" Height="720" Width="1120" MinWidth="820" MinHeight="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Icon="pack://application:,,,/Assets/appicon.png">
+    <DockPanel Margin="16">
+
+        <Border DockPanel.Dock="Top" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4"
+                Padding="12" Margin="0,0,0,10" Background="#FAFBFC">
+            <StackPanel>
+                <TextBlock TextWrapping="Wrap" Foreground="#444"
+                           Text="Listens for the traffic devices send by themselves (DHCP, NetBIOS, mDNS, LLMNR, SSDP, WS-Discovery, BACnet, EtherNet/IP), sends broadcast queries that provoke an answer, and reads the Windows ARP table. Broadcast reaches the network card regardless of subnet, so a device on a completely different subnet - one you cannot ping - still shows up here."/>
+                <TextBlock TextWrapping="Wrap" Foreground="#666" FontSize="11" Margin="0,6,0,0"
+                           Text="A device that only sends ARP - a controller looking for its gateway, for example - is only visible if this machine holds an address in its subnet, because that is when Windows puts it in the ARP table. The table is re-read every two seconds while listening. Profinet DCP and LLDP/CDP run directly on Ethernet without IP and cannot be reached without a packet driver (Npcap)."/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBlock x:Name="VendorSourceText" TextWrapping="Wrap" FontSize="11" Foreground="#666"
+                               VerticalAlignment="Center" MaxWidth="700"/>
+                    <Button x:Name="DownloadOuiButton" Content="Download list" Padding="10,2" Margin="10,0,0,0"
+                            Click="DownloadOui_Click"
+                            ToolTip="Downloads the official IEEE OUI list (oui.csv) next to the program - needs internet once"/>
+                </StackPanel>
+
+                <TextBlock Text="This machine" FontWeight="SemiBold" Margin="0,10,0,2"/>
+                <TextBlock x:Name="AdapterText" TextWrapping="Wrap" FontSize="11" Foreground="#444"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <TextBlock Text="Listen for" VerticalAlignment="Center"/>
+                    <TextBox x:Name="DurationBox" Width="50" Text="30" Padding="4,3" Margin="6,0"/>
+                    <TextBlock Text="seconds" VerticalAlignment="Center" Margin="0,0,14,0"/>
+                    <Button x:Name="StartButton" Content="Start discovery" Width="130" Height="28" Click="Start_Click"/>
+                    <Button x:Name="StopButton" Content="Stop" Width="80" Height="28" Margin="8,0,0,0"
+                            Click="Stop_Click" IsEnabled="False"/>
+                    <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="14,0,0,0" Foreground="#666"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border DockPanel.Dock="Bottom" Margin="0,10,0,0">
+            <StackPanel>
+                <TextBlock x:Name="HintText" TextWrapping="Wrap" Foreground="#B26A00" FontSize="11" Margin="0,0,0,8"/>
+
+                <!-- Actions for the selected device -->
+                <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,0,0,6">
+                    <WrapPanel.Resources>
+                        <Style TargetType="Button">
+                            <Setter Property="Height" Value="28"/>
+                            <Setter Property="MinWidth" Value="110"/>
+                            <Setter Property="Padding" Value="10,0"/>
+                            <Setter Property="Margin" Value="0,0,8,6"/>
+                        </Style>
+                    </WrapPanel.Resources>
+                    <Button Content="Match subnet…" Click="MatchSubnet_Click"
+                            ToolTip="Gives this machine an address in the selected device's subnet, so you can reach its web page"/>
+                    <Button Content="Open web page" Click="OpenWeb_Click"
+                            ToolTip="Opens http://&lt;device&gt; in the browser - use it to set the address on the device itself"/>
+                    <Button Content="Give address (DHCP)…" Click="Dhcp_Click" MinWidth="150"
+                            ToolTip="Runs a small DHCP server on this adapter for the selected device"/>
+                    <Button Content="Restore DHCP" Click="RestoreDhcp_Click"
+                            ToolTip="Puts the adapter back on automatic addressing"/>
+                    <Button Content="Copy command" Click="CopyCommand_Click"
+                            ToolTip="Copies the netsh command that adds a temporary IP in the selected device's subnet"/>
+                </WrapPanel>
+
+                <!-- List and window actions -->
+                <WrapPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <WrapPanel.Resources>
+                        <Style TargetType="Button">
+                            <Setter Property="Height" Value="28"/>
+                            <Setter Property="MinWidth" Value="95"/>
+                            <Setter Property="Padding" Value="10,0"/>
+                            <Setter Property="Margin" Value="8,0,0,0"/>
+                        </Style>
+                    </WrapPanel.Resources>
+                    <Button Content="Select all" Click="SelectAll_Click"/>
+                    <Button Content="Select none" Click="SelectNone_Click"/>
+                    <Button Content="Close" IsCancel="True"/>
+                    <Button x:Name="AddButton" Content="Add selected" Click="Add_Click" IsEnabled="False"
+                            MinWidth="120" FontWeight="SemiBold"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <DataGrid x:Name="ResultGrid" AutoGenerateColumns="False" CanUserAddRows="False"
+                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" ColumnWidth="Auto"
+                  SelectionMode="Extended">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding InLocalSubnet}" Value="False">
+                            <Setter Property="Background" Value="#FFF6E0"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="Add" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="Auto" MinWidth="45"/>
+                <DataGridTextColumn Header="IP address" Binding="{Binding Ip}" IsReadOnly="True" Width="Auto" MinWidth="120"/>
+                <DataGridTextColumn Header="Network adapter" Binding="{Binding Adapter}" IsReadOnly="True" Width="Auto" MinWidth="130"/>
+                <DataGridTextColumn Header="Subnet" Binding="{Binding SubnetText}" IsReadOnly="True" Width="Auto" MinWidth="120"/>
+                <DataGridTextColumn Header="MAC" Binding="{Binding Mac}" IsReadOnly="True" Width="Auto" MinWidth="130"/>
+                <DataGridTextColumn Header="Manufacturer" Binding="{Binding Vendor}" IsReadOnly="True" Width="Auto" MinWidth="130"/>
+                <DataGridTextColumn Header="Seen via" Binding="{Binding ProtocolText}" IsReadOnly="True" Width="Auto" MinWidth="130"/>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="Auto" MinWidth="150"/>
+                <DataGridTextColumn Header="First seen" Binding="{Binding FirstSeen}" IsReadOnly="True" Width="Auto" MinWidth="80"/>
+                <DataGridTextColumn Header="Info" Binding="{Binding Info}" IsReadOnly="True" Width="*" MinWidth="160"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Window>

@@ -1,0 +1,39 @@
+<Window x:Class="ST_Device_Monitoring.Views.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="About ST Device Monitoring" Height="430" Width="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize" ShowInTaskbar="False" Background="White">
+    <Grid Margin="24,20,24,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Image Grid.Row="0" Source="pack://application:,,,/Assets/logo.png"
+               Height="170" HorizontalAlignment="Center" Margin="0,0,0,14"
+               RenderOptions.BitmapScalingMode="HighQuality"/>
+
+        <TextBlock Grid.Row="1" x:Name="ProductText" Text="ST Device Monitoring"
+                   FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+
+        <TextBlock Grid.Row="2" x:Name="VersionText" Text="v1.24.0 · built 2026-08-18"
+                   FontSize="12" Foreground="#666" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+
+        <TextBlock Grid.Row="3" x:Name="CopyrightText"
+                   Text="Developed by Jesper Bødewadt Møller. All rights reserved."
+                   FontSize="12" TextWrapping="Wrap" TextAlignment="Center"
+                   HorizontalAlignment="Center" Margin="0,16,0,0"/>
+
+        <TextBlock Grid.Row="4" x:Name="RuntimeText" FontSize="11" Foreground="#888"
+                   TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                   Margin="0,12,0,0"/>
+
+        <Button Grid.Row="5" Content="Close" Width="90" Height="28"
+                HorizontalAlignment="Right" Margin="0,14,0,0" IsDefault="True" IsCancel="True"/>
+    </Grid>
+</Window>

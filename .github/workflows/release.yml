@@ -1,0 +1,88 @@
+name: Release
+
+# Builds the application and publishes a GitHub release when a version tag is pushed:
+#     git tag v1.28.1
+#     git push origin v1.28.1
+# It can also be started by hand from the Actions tab.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    env:
+      PROJECT: 'ST Device Monitoring/ST Device Monitoring.csproj'
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore "$env:PROJECT"
+
+      - name: Build
+        run: dotnet build "$env:PROJECT" -c Release --no-restore
+
+      # One exe that runs on any Windows machine, no .NET installation needed (~150 MB).
+      - name: Publish self-contained
+        run: >
+          dotnet publish "$env:PROJECT" -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=None
+          -o publish/selfcontained
+
+      # Small exe (~2 MB) for machines that already have the .NET 8 Desktop Runtime.
+      - name: Publish framework-dependent
+        run: >
+          dotnet publish "$env:PROJECT" -c Release -r win-x64 --self-contained false
+          -p:PublishSingleFile=true -p:DebugType=None
+          -o publish/framework-dependent
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          if (-not $version) { $version = "dev" }
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Copy-Item "devices.example.json" "publish/selfcontained/" -ErrorAction SilentlyContinue
+          Copy-Item "devices.example.json" "publish/framework-dependent/" -ErrorAction SilentlyContinue
+          Copy-Item "README.md" "publish/selfcontained/" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "publish/selfcontained/*"      -DestinationPath "artifacts/ST-Device-Monitoring-$version-win-x64-selfcontained.zip" -Force
+          Compress-Archive -Path "publish/framework-dependent/*" -DestinationPath "artifacts/ST-Device-Monitoring-$version-win-x64.zip" -Force
+          Copy-Item "publish/selfcontained/ST Device Monitoring.exe" "artifacts/ST-Device-Monitoring-$version.exe"
+          Get-ChildItem artifacts | Format-Table Name, Length
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ST-Device-Monitoring
+          path: artifacts/*
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          body: |
+            **ST Device Monitoring ${{ github.ref_name }}**
+
+            * `ST-Device-Monitoring-<version>.exe` - single file, nothing to install, no .NET needed.
+            * `...-selfcontained.zip` - the same exe plus README and devices.example.json.
+            * `...-win-x64.zip` - small build for machines that already have the
+              [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
+
+            devices.json, the Logs folder and oui.csv are created next to the exe on first run.

@@ -1,0 +1,117 @@
+<Window x:Class="ST_Device_Monitoring.Views.DeviceEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Device" Height="660" Width="560"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize" ShowInTaskbar="False">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="180"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <TextBox   Grid.Row="0" Grid.Column="1" x:Name="NameBox" Margin="0,0,0,8" Padding="4,3"/>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="IP address / hostname" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
+            <TextBox x:Name="HostBox" Padding="4,3" TextChanged="Host_Changed"/>
+            <TextBlock x:Name="HostHint" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" Foreground="#666"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Group / site" VerticalAlignment="Top" Margin="0,4,8,8"/>
+        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,8">
+            <ComboBox x:Name="GroupBox" IsEditable="True" Padding="4,3"/>
+            <CheckBox x:Name="GroupMasterBox" Margin="0,6,0,0"
+                      Content="Group master (uplink) - the rest of the group is only checked while this device answers"/>
+            <TextBlock Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                       Text="Use it for the switch or router the group sits behind. When the master is down the other devices in the group are paused instead of all reporting failures."/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="Check" VerticalAlignment="Center" Margin="0,0,8,4"/>
+        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,4">
+            <RadioButton x:Name="IcmpBox" Content="ICMP ping" GroupName="Mode" VerticalAlignment="Center"
+                         Checked="Mode_Changed"/>
+            <RadioButton x:Name="TcpBox" Content="TCP port" GroupName="Mode" VerticalAlignment="Center" Margin="14,0,0,0"
+                         Checked="Mode_Changed"/>
+            <RadioButton x:Name="SnmpBox" Content="SNMP" GroupName="Mode" VerticalAlignment="Center" Margin="14,0,10,0"
+                         Checked="Mode_Changed"/>
+            <TextBlock Text="Port" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="PortBox" Width="60" Padding="4,3" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="ModeHint" Foreground="#666" FontSize="11"
+                   TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+        <TextBlock Grid.Row="5" Grid.Column="0" x:Name="CommunityLabel" Text="SNMP community"
+                   VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <TextBox   Grid.Row="5" Grid.Column="1" x:Name="CommunityBox" Margin="0,0,0,8" Padding="4,3"/>
+
+        <TextBlock Grid.Row="6" Grid.Column="0" Text="Description" VerticalAlignment="Top" Margin="0,4,8,8"/>
+        <StackPanel Grid.Row="6" Grid.Column="1" Margin="0,0,0,8">
+            <TextBox x:Name="DescriptionBox" Padding="4,3" TextWrapping="Wrap" AcceptsReturn="True"
+                     Height="46" VerticalScrollBarVisibility="Auto"/>
+            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                <Button x:Name="ReadSnmpButton" Content="Read from device (SNMP)" Padding="10,3" Click="ReadSnmp_Click"/>
+                <TextBlock x:Name="SnmpStatusText" VerticalAlignment="Center" Margin="10,0,0,0"
+                           Foreground="#666" FontSize="11" TextWrapping="Wrap"/>
+            </StackPanel>
+        </StackPanel>
+
+        <TextBlock Grid.Row="7" Grid.Column="0" Text="Interval (ms)" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <DockPanel Grid.Row="7" Grid.Column="1" Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="100" Width="38" Margin="4,0,0,0" Click="Interval100_Click"/>
+                <Button Content="500" Width="38" Margin="4,0,0,0" Click="Interval500_Click"/>
+                <Button Content="1000" Width="42" Margin="4,0,0,0" Click="Interval1000_Click"/>
+            </StackPanel>
+            <TextBox x:Name="IntervalBox" Padding="4,3"/>
+        </DockPanel>
+
+        <TextBlock Grid.Row="8" Grid.Column="0" Text="Interval while down (ms)" TextWrapping="Wrap"
+                   VerticalAlignment="Center" Margin="0,0,8,2"/>
+        <StackPanel Grid.Row="8" Grid.Column="1" Margin="0,0,0,8">
+            <TextBox x:Name="DownIntervalBox" Padding="4,3"/>
+            <TextBlock Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                       Text="Used once the device is down, so a 100 ms device does not flood the network while offline. 0 = keep the normal interval."/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="9" Grid.Column="0" Text="Timeout (ms)" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <TextBox   Grid.Row="9" Grid.Column="1" x:Name="TimeoutBox" Margin="0,0,0,8" Padding="4,3"/>
+
+        <TextBlock Grid.Row="10" Grid.Column="0" Text="Failures before alarm / before logging stops"
+                   TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Vertical" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <TextBox x:Name="ThresholdBox" Width="70" Padding="4,3"/>
+                <TextBlock Text="alarm after" VerticalAlignment="Center" Margin="8,0,16,0" Foreground="#666" FontSize="11"/>
+                <TextBox x:Name="MaxLoggedBox" Width="70" Padding="4,3"/>
+                <TextBlock Text="stop logging after (0 = log all)" VerticalAlignment="Center" Margin="8,0,0,0"
+                           Foreground="#666" FontSize="11"/>
+            </StackPanel>
+            <CheckBox x:Name="EnabledBox" Content="Enabled (monitored)" Margin="0,8,0,0"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="11" Grid.ColumnSpan="2" x:Name="ErrorText" Foreground="#C62828" TextWrapping="Wrap" Margin="0,4,0,0"/>
+
+        <StackPanel Grid.Row="12" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Cancel" Width="90" Height="28" Margin="0,0,8,0" IsCancel="True"/>
+            <Button Content="Save" Width="90" Height="28" IsDefault="True" Click="Save_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

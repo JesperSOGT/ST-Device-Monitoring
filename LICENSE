@@ -1,0 +1,38 @@
+ST Device Monitoring
+Copyright (c) 2026 Jesper Bødewadt Møller. All rights reserved.
+
+PRIVATE USE LICENCE
+
+1. Permission granted
+   You may download, install and use this software free of charge for private,
+   non-commercial purposes.
+
+2. Not permitted without prior written permission from the copyright holder
+   a) Commercial use of any kind - including use within a company, an institution
+      or on behalf of a customer, whether or not a fee is charged.
+   b) Redistribution, publication, sale, rental, lending or hosting of the software
+      or any part of it.
+   c) Modification, reverse engineering, decompilation or the creation of derived
+      works.
+   d) Removal or alteration of copyright notices, the About dialog or this licence.
+
+3. Source code
+   The source code is published so it can be read and reviewed. Reading and
+   studying it is allowed; reusing it, in whole or in part, in another project is
+   not.
+
+4. No warranty
+   The software is provided "as is", without warranty of any kind, express or
+   implied, including but not limited to the warranties of merchantability and
+   fitness for a particular purpose. The copyright holder is not liable for any
+   claim, damage or other liability arising from the use of the software -
+   including, but not limited to, loss of data, missed alarms or production
+   downtime.
+
+   Monitoring software must never be the sole protection of a process or an
+   installation. Safety and availability must be secured by the plant's own
+   systems.
+
+5. Commercial licence
+   For use in a company, at a customer site or as part of a delivery, contact the
+   copyright holder through https://github.com/JesperSOGT to agree on terms.

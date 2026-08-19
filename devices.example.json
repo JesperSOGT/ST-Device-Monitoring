@@ -1,0 +1,63 @@
+{
+  "Devices": [
+    {
+      "Id": "6f9b1f6e-1f1a-4f8f-9f1e-000000000001",
+      "Name": "PLC Quay 3",
+      "Host": "192.168.1.50",
+      "Group": "Quay 3",
+      "Mode": "TcpPort",
+      "Port": 502,
+      "IntervalMs": 100,
+      "DownIntervalMs": 1000,
+      "TimeoutMs": 500,
+      "FailThreshold": 3,
+      "MaxLoggedFailures": 10,
+      "Enabled": true
+    },
+    {
+      "Id": "6f9b1f6e-1f1a-4f8f-9f1e-000000000002",
+      "Name": "Switch technical room",
+      "Host": "192.168.1.1",
+      "Group": "Quay 3",
+      "Mode": "Icmp",
+      "Port": 502,
+      "IntervalMs": 1000,
+      "DownIntervalMs": 5000,
+      "TimeoutMs": 1000,
+      "FailThreshold": 2,
+      "MaxLoggedFailures": 5,
+      "Enabled": true
+    }
+  ],
+  "LogDirectory": "Logs",
+  "LogAllPings": true,
+  "UiRefreshMs": 250,
+  "CsvSeparator": ";",
+  "LogRetentionDays": 30,
+  "AutoStart": false,
+  "WriteDailySummary": true,
+  "Alerts": {
+    "BalloonEnabled": true,
+    "SoundEnabled": true,
+    "SoundFile": "",
+    "NotifyOnRecovery": true,
+    "ThrottleSeconds": 30,
+    "EmailEnabled": false,
+    "SmtpHost": "smtp.example.com",
+    "SmtpPort": 587,
+    "SmtpUseSsl": true,
+    "SmtpUser": "",
+    "SmtpPasswordProtected": "",
+    "MailFrom": "monitoring@example.com",
+    "MailTo": "service@example.com",
+    "WebhookEnabled": false,
+    "WebhookUrl": ""
+  },
+  "Ui": {
+    "ShowTrayIcon": true,
+    "MinimizeToTray": true,
+    "CloseToTray": false,
+    "StartWithWindows": false,
+    "StartMinimized": false
+  }
+}

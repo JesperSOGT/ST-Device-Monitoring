@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <RootNamespace>ST_Device_Monitoring</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <StartupObject>ST_Device_Monitoring.Program</StartupObject>
+    <ApplicationIcon>Assets\appicon.ico</ApplicationIcon>
+    <Version>1.28.1</Version>
+    <Product>ST Device Monitoring</Product>
+    <Authors>Jesper Bødewadt Møller</Authors>
+    <Copyright>Developed by Jesper Bødewadt Møller. All rights reserved.</Copyright>
+    <NoWarn>SYSLIB0014</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- UseWindowsForms adds global usings for System.Windows.Forms and System.Drawing, which
+         collide with the WPF types (Application, Brush, Color, Pen, Timer). The tray icon file
+         imports them explicitly instead. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- App.xaml is compiled as a Page so Program.cs can be the entry point (needed for the service switch). -->
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" Generator="MSBuild:Compile" SubType="Designer" />
+    <Resource Include="Assets\logo.png" />
+    <Resource Include="Assets\appicon.png" />
+  </ItemGroup>
+
+</Project>

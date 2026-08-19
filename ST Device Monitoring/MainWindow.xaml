@@ -1,0 +1,518 @@
+<Window x:Class="ST_Device_Monitoring.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ST_Device_Monitoring.ViewModels"
+        xmlns:ctrl="clr-namespace:ST_Device_Monitoring.Controls"
+        Title="ST Device Monitoring" Height="760" Width="1500"
+        WindowStartupLocation="CenterScreen"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Icon="pack://application:,,,/Assets/appicon.png">
+
+    <Window.Resources>
+        <vm:StateToBrushConverter x:Key="StateBrush"/>
+        <vm:StateToRowBrushConverter x:Key="RowBrush"/>
+        <vm:SuppressedToBrushConverter x:Key="SuppressedBrush"/>
+
+        <!-- Right aligned numbers, left aligned text - applied to every column. -->
+        <Style x:Key="NumCell" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,0,8,0"/>
+        </Style>
+        <Style x:Key="TextCell" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="8,0,8,0"/>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- Toolbar -->
+        <ToolBarTray DockPanel.Dock="Top">
+            <ToolBar>
+                <Button x:Name="RunButton" Click="RunToggle_Click" Padding="14,4" MinWidth="130"
+                        ToolTip="Starts monitoring - press again to stop">
+                    <TextBlock x:Name="RunButtonText" Text="▶  Start" FontWeight="SemiBold"/>
+                </Button>
+                <Separator/>
+                <Button Click="Add_Click" Padding="10,4">Add device</Button>
+                <Button Click="Edit_Click" Padding="10,4">Edit</Button>
+                <Button Click="Delete_Click" Padding="10,4"
+                        ToolTip="Delete the selected device(s) - or press Del in the list. Ctrl/Shift-click selects several rows.">Delete</Button>
+                <Button Click="ScanRange_Click" Padding="10,4" ToolTip="Scan an IP range and add the devices that answer">Scan range…</Button>
+                <Button Click="Discover_Click" Padding="10,4"
+                        ToolTip="Find devices without knowing their IP - also devices on a different subnet than this machine">Discover…</Button>
+                <Separator/>
+                <Button Click="Import_Click" Padding="10,4" ToolTip="Import devices from CSV">Import</Button>
+                <Button Click="Export_Click" Padding="10,4" ToolTip="Export the device list to CSV">Export</Button>
+                <Separator/>
+                <Button Click="ToggleEnabled_Click" Padding="10,4" ToolTip="Enable/disable the selected device">Enable/disable</Button>
+                <Button Click="Reset_Click" Padding="10,4" ToolTip="Reset all counters">Reset counters</Button>
+                <Separator/>
+                <Button Click="OpenLogFolder_Click" Padding="10,4">Log folder</Button>
+                <Button Click="OpenErrorLog_Click" Padding="10,4">Error log</Button>
+                <Button Click="WriteReport_Click" Padding="10,4" ToolTip="Write summary_yyyyMMdd.csv for today">Daily report</Button>
+                <Separator/>
+                <CheckBox x:Name="LogAllBox" Content="Log every check" VerticalAlignment="Center"
+                          Margin="6,0" Checked="LogAll_Changed" Unchecked="LogAll_Changed">
+                    <CheckBox.ToolTip>
+                        <ToolTip>
+                            <StackPanel MaxWidth="380">
+                                <TextBlock Text="Log every check" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <TextBlock TextWrapping="Wrap"
+                                           Text="On: every successful check is written to ping_yyyyMMdd.csv with its response time - the full history, but about 36,000 lines per hour per device at 100 ms."/>
+                                <TextBlock TextWrapping="Wrap" Margin="0,6,0,0"
+                                           Text="Off: only failures, suppression notices, recoveries and pauses are logged - plus the first successful check of each device, so the log still shows when it was first seen online."/>
+                                <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" Foreground="#666"
+                                           Text="Counters, graphs, alarms and the daily report are the same either way."/>
+                            </StackPanel>
+                        </ToolTip>
+                    </CheckBox.ToolTip>
+                </CheckBox>
+                <Separator/>
+                <Button Click="Settings_Click" Padding="10,4">Settings…</Button>
+                <Button Click="Help_Click" Padding="10,4" ToolTip="How the functions work (F1)">Help</Button>
+                <Button Click="About_Click" Padding="10,4">About</Button>
+            </ToolBar>
+        </ToolBarTray>
+
+        <!-- Status bar -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="SummaryText" Text="Ready"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
+                <TextBlock x:Name="LogText" Text=""/>
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock x:Name="ClockText" Foreground="#666"/>
+            </StatusBarItem>
+        </StatusBar>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="190"/>
+            </Grid.RowDefinitions>
+
+            <!-- Overview tiles -->
+            <Border Grid.Row="0" Background="#F5F7FA" BorderBrush="#DDE3EA" BorderThickness="0,0,0,1" Padding="12,8">
+                <StackPanel Orientation="Horizontal">
+                    <Border Background="White" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14,6" Margin="0,0,10,0" ToolTip="Number of devices in the list, including disabled ones.">
+                        <StackPanel>
+                            <TextBlock Text="DEVICES" FontSize="10" Foreground="#78838F"/>
+                            <TextBlock x:Name="TileTotal" Text="0" FontSize="20" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="White" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14,6" Margin="0,0,10,0" ToolTip="Devices whose last check answered.">
+                        <StackPanel>
+                            <TextBlock Text="OK" FontSize="10" Foreground="#78838F"/>
+                            <TextBlock x:Name="TileOk" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="#2E7D32"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="White" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14,6" Margin="0,0,10,0" ToolTip="Devices that have reached their alarm threshold and are counted as down.">
+                        <StackPanel>
+                            <TextBlock Text="FAILING" FontSize="10" Foreground="#78838F"/>
+                            <TextBlock x:Name="TileError" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="#C62828"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="White" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14,6" Margin="0,0,10,0" ToolTip="Failed checks across all devices since the program started or the counters were reset.">
+                        <StackPanel>
+                            <TextBlock Text="TOTAL FAILURES" FontSize="10" Foreground="#78838F"/>
+                            <TextBlock x:Name="TileFails" Text="0" FontSize="20" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="White" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14,6" Margin="0,0,10,0" ToolTip="Checks sent across all devices since the program started or the counters were reset.">
+                        <StackPanel>
+                            <TextBlock Text="TOTAL CHECKS" FontSize="10" Foreground="#78838F"/>
+                            <TextBlock x:Name="TileSent" Text="0" FontSize="20" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="White" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14,6" Margin="0,0,10,0" ToolTip="Number of times a device has gone down. One outage covers many failed checks.">
+                        <StackPanel>
+                            <TextBlock Text="OUTAGES" FontSize="10" Foreground="#78838F"/>
+                            <TextBlock x:Name="TileOutages" Text="0" FontSize="20" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="White" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14,6" Margin="0,0,10,0" ToolTip="Devices where repeated failures are no longer written to the log because they passed the &quot;stop logging after&quot; limit. They are still being checked.">
+                        <StackPanel>
+                            <TextBlock Text="LOGGING PAUSED" FontSize="10" Foreground="#78838F"/>
+                            <TextBlock x:Name="TileSuppressed" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="#E65100"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="White" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14,6" ToolTip="Devices that are not being checked at all because their group master (the uplink) is down.">
+                        <StackPanel>
+                            <TextBlock Text="PAUSED (UPLINK)" FontSize="10" Foreground="#78838F"/>
+                            <TextBlock x:Name="TileBlocked" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="#456C8C"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- Filter bar -->
+            <Border Grid.Row="1" Background="White" BorderBrush="#DDE3EA" BorderThickness="0,0,0,1" Padding="12,6">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Search" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox x:Name="SearchBox" Width="220" Padding="4,3" TextChanged="Search_Changed"
+                             ToolTip="Filters on name, IP/host and group"/>
+                    <TextBlock Text="Group" VerticalAlignment="Center" Margin="16,0,6,0"/>
+                    <ComboBox x:Name="GroupBox" Width="180" SelectionChanged="Group_Changed"/>
+                    <CheckBox x:Name="OnlyFailuresBox" Content="Only failures" VerticalAlignment="Center"
+                              Margin="16,0,0,0" Checked="Filter_Changed" Unchecked="Filter_Changed"/>
+                    <Button Content="Clear" Padding="10,2" Margin="16,0,0,0" Click="ClearFilter_Click"/>
+                    <TextBlock x:Name="FilterCountText" VerticalAlignment="Center" Margin="16,0,0,0" Foreground="#666"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Device table: every column sizes itself to its content -->
+            <DataGrid x:Name="DeviceGrid" Grid.Row="2"
+                      AutoGenerateColumns="False" IsReadOnly="True"
+                      CanUserAddRows="False" CanUserDeleteRows="False"
+                      CanUserResizeColumns="True" CanUserSortColumns="True"
+                      ColumnWidth="Auto"
+                      SelectionMode="Extended" SelectionUnit="FullRow" HeadersVisibility="Column"
+                      GridLinesVisibility="Horizontal" RowHeight="26"
+                      EnableRowVirtualization="True"
+                      MouseDoubleClick="Grid_DoubleClick"
+                      SelectionChanged="Grid_SelectionChanged"
+                      PreviewKeyDown="Grid_PreviewKeyDown">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Setter Property="Background" Value="{Binding State, Converter={StaticResource RowBrush}}"/>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Width="Auto" MinWidth="78" SortMemberPath="State">
+                        <DataGridTemplateColumn.Header>
+                            <TextBlock Text="Status">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Current state, based on failures in a row - not on response time.&#10;&#10;OK = last check answered.&#10;Unstable = 1 or more failures in a row, but fewer than the alarm threshold.&#10;FAIL = failures in a row have reached the threshold.&#10;Paused = the group master is down, so this device is not checked.&#10;Stopped / Disabled = monitoring is not running for this device."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{Binding State, Converter={StaticResource StateBrush}}"
+                                        CornerRadius="3" Padding="8,1" Margin="4,2" HorizontalAlignment="Stretch">
+                                    <TextBlock Text="{Binding StateText}" Foreground="White"
+                                               FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Binding="{Binding Name}" Width="Auto" MinWidth="120"
+                                        ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Device">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                               Text="The name you gave the device. With SNMP it is filled in from sysName if you left it empty."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding Host}" Width="Auto" MinWidth="110"
+                                        ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="IP / host">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                               Text="The address being checked. A hostname is resolved via DNS; an IPv4 address is validated strictly when you type it."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding GroupText}" Width="Auto" MinWidth="90"
+                                        SortMemberPath="Group" ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Group">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Group / site, used for filtering.&#10;&#10;A star and 'master' marks the group master - the uplink. While the master is down, the rest of the group is paused instead of all reporting failures."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding ModeText}" Width="Auto" MinWidth="70"
+                                        ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Check">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="How the device is checked.&#10;&#10;ICMP = classic ping.&#10;TCP nnn = a TCP connection is opened to that port (502 Modbus, 102 S7, 80 HTTP) - use it for devices that block ICMP.&#10;SNMP nnn = SNMP v2c GET; also reads the device description."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding Description}" Width="Auto" MinWidth="120"
+                                        ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Description">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                               Text="Free text. In SNMP mode it is filled in automatically from sysDescr (and sysLocation) the first time a check succeeds."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding Vendor}" Width="Auto" MinWidth="110"
+                                        ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Manufacturer">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Manufacturer looked up from the first half of the MAC address (the IEEE OUI), the same way Wireshark shows it.&#10;&#10;The names come from Wireshark's &quot;manuf&quot; file if Wireshark is installed, or from a manuf/oui.txt file placed next to this program. Without such a file the column stays empty."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Binding="{Binding MacAddress}" Width="Auto" MinWidth="130"
+                                        ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="MAC">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                               Text="Looked up in the Windows ARP table the first time the device answers, and stored in devices.json. Only devices on the same subnet have an ARP entry - a device behind a router stays empty."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding IntervalText}" Width="Auto" MinWidth="110"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Interval (up/down)">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="How often the device is checked. Two values mean: normal interval / interval used while the device is down, so a fast device does not flood the network while it is offline."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding TimeoutMs, StringFormat={}{0} ms}" Width="Auto" MinWidth="70"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Timeout">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="How long to wait for an answer before the check counts as failed.&#10;&#10;A reply that arrives later than this is counted as a failure and has no response time - which is why a timeout never shows up in Avg or Min/max. If you see losses while Min/max is well below the timeout, try raising it."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding LastRttText}" Width="Auto" MinWidth="75"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Response">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                               Text="Response time of the most recent successful check. Shows '-' while the device is failing."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding AvgRttText}" Width="Auto" MinWidth="65"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Avg">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Average response time of all successful checks since the program started or the counters were reset. Failed checks are not included."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding MinMaxRttText}" Width="Auto" MinWidth="95"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Min / max">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Fastest and slowest answer received. Only successful checks count, so a timeout is never visible here - a device can have losses even though max is far below the timeout."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding Loss60Text}" Width="Auto" MinWidth="70"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Loss 60s">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Percentage of checks that failed during the last 60 seconds.&#10;&#10;This is the number to watch while troubleshooting: it reacts immediately, unlike Fail % which is diluted by everything that has happened since the program started."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding Jitter60Text}" Width="Auto" MinWidth="70"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Jitter 60s">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Average variation between two consecutive response times over the last 60 seconds. High jitter next to a low average means the connection or the device is uneven - and that some answers may pass the timeout."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding Sent}" Width="Auto" MinWidth="70"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Checks">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                               Text="Total number of checks sent since the program started or the counters were reset."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding Failed}" Width="Auto" MinWidth="65"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Failures">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                               Text="Number of checks that did not get an answer in time, counted over the same period as Checks."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding FailPercentText}" Width="Auto" MinWidth="60"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Fail %">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Failures as a percentage of all checks since the program started or the counters were reset. Reset the counters before a test run so the figure only covers the test."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding ConsecutiveFails}" Width="Auto" MinWidth="60"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="In a row">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Failures in a row right now. One or more but below the alarm threshold shows the device as Unstable; reaching the threshold shows it as FAIL and raises an alarm."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding MaxConsecutiveFails}" Width="Auto" MinWidth="65"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Max row">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                               Text="The highest number of failures in a row seen so far - a quick measure of the worst dropout."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding OutageCount}" Width="Auto" MinWidth="60"
+                                        ElementStyle="{StaticResource NumCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Outages">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Number of times the device has passed the alarm threshold and gone down. One outage can cover many failed checks."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTemplateColumn Width="Auto" MinWidth="95" SortMemberPath="SuppressedEntries">
+                        <DataGridTemplateColumn.Header>
+                            <TextBlock Text="Logging">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="Whether failures are still being written to the log for this device.&#10;&#10;On = logging normally.&#10;Paused (n) = the device has failed more times in a row than 'stop logging after', so the repeated failures are not logged; n is how many were skipped. Checking continues, and a RECOVERED line is written when it answers again."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding LoggingText}" Margin="8,0" VerticalAlignment="Center"
+                                           Foreground="{Binding LoggingSuppressed, Converter={StaticResource SuppressedBrush}}"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Binding="{Binding LastOkText}" Width="Auto" MinWidth="105"
+                                        ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Last OK">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                               Text="When the device last answered."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding LastFailText}" Width="Auto" MinWidth="105"
+                                        ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Last failure">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                               Text="When a check last failed. Compare it with Last OK to see whether the problem is happening right now."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding LastError}" Width="*" MinWidth="140"
+                                        ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Error text">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="400" TextWrapping="Wrap"
+                                               Text="The most recent error: 'Timeout - no reply', 'Destination host unreachable', a TCP/SNMP error - or the reason the device is paused."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <GridSplitter Grid.Row="3" Height="4" HorizontalAlignment="Stretch" Background="#E5E9EE"/>
+
+            <!-- Detail panel for the selected device -->
+            <Border Grid.Row="4" Padding="12,8" Background="White">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" x:Name="DetailHeader" Text="Select a device to see its history"
+                               FontWeight="SemiBold" FontSize="13" Margin="0,0,0,2"/>
+                    <TextBlock DockPanel.Dock="Top" x:Name="DetailSub" Foreground="#666" FontSize="11" Margin="0,0,0,6"/>
+                    <TextBlock DockPanel.Dock="Bottom" x:Name="DetailError" Foreground="#C62828" FontSize="11"
+                               TextTrimming="CharacterEllipsis" Margin="0,6,0,0"/>
+                    <ctrl:HistoryStrip x:Name="History" MinHeight="80"/>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>
