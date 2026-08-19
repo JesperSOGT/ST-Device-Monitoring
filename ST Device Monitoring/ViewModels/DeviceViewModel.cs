@@ -73,8 +73,19 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
 
     /// <summary>Explains a paused device in the detail panel and the error column.</summary>
     public string BlockedText => _stats.Blocked
-        ? $"Paused - group master \"{_stats.GateSource}\" is down"
+        ? _stats.BlockReason ?? (string.IsNullOrEmpty(_stats.GateSource)
+            ? "Paused"
+            : $"Paused - group master \"{_stats.GateSource}\" is down")
         : string.Empty;
+
+    /// <summary>True while the group schedule is between two runs.</summary>
+    public bool BlockedBySchedule => _stats.BlockedBySchedule;
+
+    /// <summary>
+    /// Schedule column: "every 30 min · runs 2 min · 07:00-17:00 · Mon-Fri", or "Continuous" for a
+    /// group without a schedule.
+    /// </summary>
+    public string ScheduleText => Monitor.Schedule is { } schedule ? schedule.Summary : "Continuous";
 
     public long Sent => _stats.Sent;
     public long Failed => _stats.Failed;
@@ -114,6 +125,7 @@ public sealed class DeviceViewModel : INotifyPropertyChanged
                         + (long)stats.State * 3 + stats.ConsecutiveFails
                         + (stats.LoggingSuppressed ? 1 : 0)
                         + (stats.Blocked ? 5 : 0)
+                        + (stats.BlockReason?.GetHashCode() ?? 0)
                         + (long)(stats.Rolling.LossPercent * 10) * 13
                         + (long)(stats.Rolling.AvgJitter * 10) * 11;
         _stats = stats;

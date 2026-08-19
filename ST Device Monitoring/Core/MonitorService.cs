@@ -16,6 +16,9 @@ public sealed class MonitorService : IAsyncDisposable
     public CsvLogger Logger { get; }
     public AlertDispatcher Alerts { get; }
 
+    /// <summary>Runs the per-group schedules ("every 30 min, check for 2 min, 07:00-17:00").</summary>
+    public GroupScheduler Scheduler { get; }
+
     /// <summary>Raised (from a check thread) when any device goes down or recovers.</summary>
     public event Action<DeviceAlert>? Alert;
 
@@ -33,6 +36,7 @@ public sealed class MonitorService : IAsyncDisposable
         };
         Logger.CleanupOldFiles(config.LogRetentionDays);
         Alerts = new AlertDispatcher(config.Alerts);
+        Scheduler = new GroupScheduler(config.Schedules);
 
         foreach (var device in config.Devices)
             Attach(new DeviceMonitor(device, Logger));
@@ -47,10 +51,15 @@ public sealed class MonitorService : IAsyncDisposable
     public IReadOnlyCollection<DeviceMonitor> Monitors => _monitors.Values.ToList();
 
     /// <summary>
-    /// Links every group to its master. Devices in a group that has a master are only checked
-    /// while that master answers - when the uplink is down the devices behind it are paused
-    /// instead of all failing at once.
-    /// Call this whenever devices are added, removed or edited.
+    /// Rebuilds the gate in front of every device's check loop. Two things can hold a device back:
+    ///
+    /// - the group schedule: the group is only checked in short runs ("every 30 minutes, check for
+    ///   2 minutes, 07:00-17:00 on weekdays"). This applies to every device in the group, the
+    ///   master included.
+    /// - the group master: while the uplink is down the devices behind it are paused instead of
+    ///   all failing at once.
+    ///
+    /// Call this whenever devices or schedules are added, removed or edited.
     /// </summary>
     public void RebuildGroupGates()
     {
@@ -62,24 +71,70 @@ public sealed class MonitorService : IAsyncDisposable
                 masters[group] = monitor;
         }
 
+        var scheduler = Scheduler;
+
         foreach (var monitor in _monitors.Values)
         {
             var group = monitor.Config.Group?.Trim() ?? string.Empty;
 
-            if (group.Length == 0 || monitor.Config.IsGroupMaster ||
-                !masters.TryGetValue(group, out var master) || ReferenceEquals(master, monitor))
+            var schedule = group.Length == 0 ? null : scheduler.Find(group);
+            monitor.Schedule = schedule is { Enabled: true } ? schedule : null;
+
+            Func<GateResult>? scheduleGate = null;
+            if (monitor.Schedule != null)
             {
-                monitor.CanCheck = null;
-                monitor.GateSourceName = null;
-                continue;
+                var scheduledGroup = group;
+                scheduleGate = () =>
+                {
+                    var state = scheduler.GetState(scheduledGroup);
+                    return state.Open
+                        ? GateResult.Allow
+                        : GateResult.Block(state.Reason ?? "Outside the group schedule", true);
+                };
             }
 
-            var gateMaster = master;
-            monitor.GateSourceName = gateMaster.Config.Name;
-            // Open gate when the master is up, unknown, stopped or disabled - only a confirmed
-            // outage on the master pauses the rest of the group.
-            monitor.CanCheck = () => !gateMaster.IsDown;
+            Func<GateResult>? masterGate = null;
+            if (group.Length > 0 && !monitor.Config.IsGroupMaster &&
+                masters.TryGetValue(group, out var master) && !ReferenceEquals(master, monitor))
+            {
+                var gateMaster = master;
+                monitor.GateSourceName = gateMaster.Config.Name;
+                // Open gate when the master is up, unknown, stopped or disabled - only a confirmed
+                // outage on the master pauses the rest of the group.
+                masterGate = () => gateMaster.IsDown
+                    ? GateResult.Block($"Group master \"{gateMaster.Config.Name}\" is down - checking paused", false)
+                    : GateResult.Allow;
+            }
+            else
+            {
+                monitor.GateSourceName = null;
+            }
+
+            // The schedule is asked first, so a device outside its run says so instead of blaming
+            // a master that is not being checked either.
+            monitor.CheckGate = Combine(scheduleGate, masterGate);
         }
+    }
+
+    private static Func<GateResult>? Combine(Func<GateResult>? first, Func<GateResult>? second)
+    {
+        if (first == null) return second;
+        if (second == null) return first;
+        return () =>
+        {
+            var result = first();
+            return result.Open ? second() : result;
+        };
+    }
+
+    /// <summary>
+    /// Applies edited schedules without touching any running check loop. A device that is inside
+    /// a run keeps running; one that falls outside is paused within a second.
+    /// </summary>
+    public void ApplySchedules()
+    {
+        Scheduler.Reload(Config.Schedules);
+        RebuildGroupGates();
     }
 
     /// <summary>The master of a group, if one is defined.</summary>
@@ -90,6 +145,18 @@ public sealed class MonitorService : IAsyncDisposable
             m.Config.IsGroupMaster &&
             string.Equals(m.Config.Group?.Trim(), group.Trim(), StringComparison.OrdinalIgnoreCase));
     }
+
+    /// <summary>Every group name in use, sorted.</summary>
+    public IReadOnlyList<string> Groups => Config.Devices
+        .Select(d => d.Group?.Trim() ?? string.Empty)
+        .Where(g => g.Length > 0)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(g => g, StringComparer.CurrentCultureIgnoreCase)
+        .ToList();
+
+    /// <summary>Number of devices in a group.</summary>
+    public int CountInGroup(string group) => Config.Devices.Count(d =>
+        string.Equals(d.Group?.Trim(), group?.Trim(), StringComparison.OrdinalIgnoreCase));
 
     /// <summary>True between "Start" and "Stop", regardless of how many devices are enabled.</summary>
     public bool IsMonitoring { get; private set; }
@@ -205,6 +272,7 @@ public sealed class MonitorService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _summaryTimer.DisposeAsync().ConfigureAwait(false);
+        Scheduler.Dispose();
         await StopAllAsync().ConfigureAwait(false);
 
         foreach (var m in _monitors.Values)

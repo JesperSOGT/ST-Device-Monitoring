@@ -39,11 +39,17 @@ public readonly struct DeviceStats
     /// <summary>Loss and jitter over the last 60 seconds - reacts immediately, unlike the totals.</summary>
     public RollingStats Rolling { get; init; }
 
-    /// <summary>True when checking is paused because the group master is down.</summary>
+    /// <summary>True when checking is paused - by the group master or by the group's schedule.</summary>
     public bool Blocked { get; init; }
 
     /// <summary>Name of the group master that controls this device, if any.</summary>
     public string? GateSource { get; init; }
+
+    /// <summary>Why checking is paused, e.g. "next run at 14:30" or "group master is down".</summary>
+    public string? BlockReason { get; init; }
+
+    /// <summary>True when the pause comes from the group's schedule rather than from the master.</summary>
+    public bool BlockedBySchedule { get; init; }
 
     public double FailPercent => Sent == 0 ? 0 : Failed * 100.0 / Sent;
 }
@@ -56,6 +62,9 @@ public enum DeviceState
     Ok,
     Warning,
     Error,
-    /// <summary>Paused because the group master (uplink) is down - the device is not checked.</summary>
+    /// <summary>
+    /// Paused - either because the group master (uplink) is down or because the group's schedule
+    /// is between two runs. The device is not checked at all.
+    /// </summary>
     Blocked
 }

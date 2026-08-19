@@ -122,6 +122,42 @@ public static class HelpContent
         },
         new()
         {
+            Title = "Group schedules (periodic checking)",
+            Body =
+                "Not every group needs to be watched every second. Under 'Schedules…' a group can be set to " +
+                "run periodically instead: check for a short while, then rest until the next time.\n\n" +
+                "Run every\n" +
+                "The interval between two runs - from one minute up to a week. This is the number that " +
+                "answers 'how often should this group be checked': every 15 minutes, every hour, every " +
+                "24 hours.\n\n" +
+                "Each run lasts\n" +
+                "How long the group is checked each time, in seconds. During a run every device uses its own " +
+                "interval and timeout exactly as usual, so a two minute run at 1000 ms gives about 120 " +
+                "measurements per device - enough to see packet loss and jitter, not just yes/no.\n\n" +
+                "Only between / on these days\n" +
+                "An optional time window and a set of weekdays, for example 07:00-17:00 Monday to Friday. " +
+                "Two identical times mean all day. An end time earlier than the start time means the window " +
+                "crosses midnight, like 22:00 to 06:00 - such a window belongs to the day it started on, so " +
+                "a window that starts Friday evening still finishes on Saturday morning.\n\n" +
+                "What happens between two runs\n" +
+                "The whole group is paused, master included: nothing is sent, no failures are counted, no " +
+                "alarms are raised and the counters are frozen where they were. The log gets one line when " +
+                "the run finishes and one when the next run starts, and the status column shows 'Paused' " +
+                "with the time of the next run in the error text column.\n\n" +
+                "Predictable times\n" +
+                "The runs are anchored to the start of the active window, so 'every 30 minutes from 07:00' " +
+                "always lands on 07:00, 07:30, 08:00 and so on - also after the program has been restarted. " +
+                "They do not drift.\n\n" +
+                "Groups that have no schedule, and groups whose schedule is switched off, keep being checked " +
+                "continuously exactly as before. Changing a schedule never restarts a check loop: it only " +
+                "opens or closes the gate in front of the group, so the other devices are not disturbed.\n\n" +
+                "Typical uses: a remote site on a metered or slow connection that only needs an hourly health " +
+                "check; a customer network you may only touch outside production hours; or a long unattended " +
+                "test where a five minute sample every hour says as much as a week of continuous pinging - " +
+                "and keeps the log a fraction of the size."
+        },
+        new()
+        {
             Title = "Notifications and alarms",
             Body =
                 "Settings -> Notifications. An alarm is raised when a device passes its 'failures before " +
@@ -244,6 +280,44 @@ public static class HelpContent
                 "re-read every two seconds during discovery.\n\n" +
                 "Profinet DCP and LLDP/CDP are not included: they run directly on Ethernet without IP and need a " +
                 "packet driver (Npcap), which cannot be shipped with the application."
+        },
+        new()
+        {
+            Title = "Updating from GitHub",
+            Body =
+                "New versions are published as releases on GitHub, and the program can install them over " +
+                "itself. Press 'Updates…' in the toolbar, or open Settings -> Updates.\n\n" +
+                "What the check does\n" +
+                "It reads the newest release from the public GitHub API and compares the tag (v1.30.0) with " +
+                "the version this copy was built as. Nothing about the machine is sent, no account is needed " +
+                "and nothing is installed on its own. With 'Look for a new version when the program starts' " +
+                "the check runs once, a few seconds after start; if a newer release exists, a yellow note " +
+                "appears in the status bar. If there is no internet the check fails silently.\n\n" +
+                "Which file is downloaded\n" +
+                "A release carries two exe files: the big one that runs on its own and the small one that " +
+                "needs the .NET 8 Desktop Runtime. The program knows which of the two it was published as and " +
+                "picks the matching file; a build straight from Visual Studio gets the big one, because that " +
+                "one runs everywhere. You can choose the other one in the File box.\n\n" +
+                "How the swap works\n" +
+                "A running program holds its own exe locked, so it cannot overwrite itself. The new file is " +
+                "downloaded to the temporary folder, its size and - when GitHub reports one - its SHA-256 " +
+                "checksum are verified, and only then is a small script started. The script keeps trying to " +
+                "copy the new file over the old one until the program has closed, then starts it again and " +
+                "deletes itself. If the copy has not succeeded after 90 seconds it stops and tells you where " +
+                "the downloaded file is, so nothing is left half-finished.\n\n" +
+                "Going back\n" +
+                "The version that was replaced is kept next to the program as " +
+                "'ST Device Monitoring.exe.previous'. If a new version misbehaves, close the program, delete " +
+                "the exe and rename that file back.\n\n" +
+                "The Windows service\n" +
+                "If the service is installed the script stops it before the swap and starts it again " +
+                "afterwards. That needs administrator rights, so Windows shows a UAC prompt. The same happens " +
+                "when the program sits in a folder you cannot write to, such as Program Files.\n\n" +
+                "Skipping a version\n" +
+                "'Skip this version' stops that one release from being announced again - a later one still " +
+                "is. Settings -> Updates has a button to clear it.\n\n" +
+                "Monitoring stops while the program restarts, so the update always asks first. Devices.json, " +
+                "the logs and every setting are untouched by an update."
         },
         new()
         {

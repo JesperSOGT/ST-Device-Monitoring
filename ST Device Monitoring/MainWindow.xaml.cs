@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private readonly ICollectionView _view;
     private readonly DispatcherTimer _timer;
     private TrayNotifier? _tray;
+    private UpdateInfo? _pendingUpdate;
     private bool _initialized;
     private bool _exitRequested;
 
@@ -79,6 +80,79 @@ public partial class MainWindow : Window
             Loaded += (_, _) => HideToTray();
 
         WarnIfServiceRunning();
+
+        _ = CheckForUpdatesAtStartupAsync();
+    }
+
+    // ---------- Updates ----------
+
+    /// <summary>
+    /// Asks GitHub once, a few seconds after start, whether a newer release exists. It never
+    /// installs anything and never interrupts the monitoring - it only lights up the note in the
+    /// status bar. Any failure is ignored on purpose: a machine without internet must not be
+    /// nagged every time the program opens.
+    /// </summary>
+    private async Task CheckForUpdatesAtStartupAsync()
+    {
+        var settings = _service.Config.Updates;
+        if (!settings.CheckOnStartup) return;
+
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5));
+
+            var (info, _) = await UpdateChecker.CheckAsync(
+                settings.RepositoryOwner, settings.RepositoryName, settings.IncludePreReleases);
+
+            settings.LastChecked = DateTime.Now;
+            if (info == null || !info.IsNewer) return;
+            if (string.Equals(info.Tag, settings.SkipVersion, StringComparison.OrdinalIgnoreCase)) return;
+
+            _pendingUpdate = info;
+            ShowUpdateBanner(info);
+
+            if (_service.Config.Alerts.BalloonEnabled)
+                _tray?.ShowBalloon("Update available",
+                    $"{AppInfo.ProductName} {info.Tag} has been published. Open the program to install it.", false);
+        }
+        catch
+        {
+            // No internet, DNS blocked, proxy - not worth telling the user about at startup.
+        }
+    }
+
+    private void ShowUpdateBanner(UpdateInfo info)
+    {
+        UpdateBanner.Content = $"⬆  Update available: {info.Tag}";
+        UpdateBanner.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Opens the update window. Nothing is downloaded or replaced until the user confirms there;
+    /// when the swap starts, this window has to close so the exe is released.
+    /// </summary>
+    private void Update_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new UpdateWindow(_service.Config, _pendingUpdate) { Owner = this };
+        dialog.ShowDialog();
+
+        if (dialog.SettingsChanged) Save();
+
+        if (dialog.RestartRequested)
+        {
+            // The update script is waiting for this program to release its own exe file.
+            _exitRequested = true;
+            Close();
+            return;
+        }
+
+        var settings = _service.Config.Updates;
+        if (_pendingUpdate != null &&
+            string.Equals(_pendingUpdate.Tag, settings.SkipVersion, StringComparison.OrdinalIgnoreCase))
+        {
+            _pendingUpdate = null;
+            UpdateBanner.Visibility = Visibility.Collapsed;
+        }
     }
 
     // ---------- Tray ----------
@@ -324,7 +398,8 @@ public partial class MainWindow : Window
                          $"{vm.Sent:N0} checks · {vm.Failed:N0} failures ({vm.FailPercentText}) · " +
                          $"last 60 s: {vm.Loss60Text} loss, {vm.Jitter60Text} jitter · " +
                          $"avg {vm.AvgRttText} · min/max {vm.MinMaxRttText} · outages: {vm.OutageCount:N0} · " +
-                         $"logging: {vm.LoggingText}";
+                         $"logging: {vm.LoggingText}" +
+                         (vm.Monitor.Schedule == null ? "" : $" · schedule: {vm.ScheduleText}");
         DetailError.Text = string.IsNullOrEmpty(vm.LastError) ? "" : "Last error: " + vm.LastError;
         History.SlowThreshold = Math.Max(20, vm.TimeoutMs / 2);
         History.Samples = vm.History;
@@ -632,6 +707,15 @@ public partial class MainWindow : Window
         var dialog = new SettingsWindow(_service.Config, _service.Alerts) { Owner = this };
         if (dialog.ShowDialog() != true) return;
 
+        if (dialog.RestartForUpdate)
+        {
+            // An update was started from the settings window - release the exe now.
+            Save();
+            _exitRequested = true;
+            Close();
+            return;
+        }
+
         _service.Logger.LogAllPings = _service.Config.LogAllPings;
         _service.Logger.Rotation = _service.Config.LogRotation;
         _service.Logger.MaxFileSizeBytes = Math.Max(0, (long)_service.Config.MaxLogFileSizeMB) * 1024 * 1024;
@@ -644,6 +728,26 @@ public partial class MainWindow : Window
         if (dialog.RestartRecommended)
             MessageBox.Show("The log folder has been changed. Restart the application for it to take effect.",
                 "ST Device Monitoring", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    /// <summary>
+    /// Group schedules. Applying them never stops or restarts a check loop - the schedule only
+    /// opens and closes the gate in front of the devices in the group.
+    /// </summary>
+    private void Schedules_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ScheduleWindow(_service.Groups, _service.Config.Schedules, _service.CountInGroup)
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        _service.Config.Schedules = dialog.Schedules;
+        _service.ApplySchedules();
+        Save();
+
+        foreach (var vm in _devices) vm.ConfigChanged();
+        Refresh();
     }
 
     private void Reset_Click(object sender, RoutedEventArgs e)

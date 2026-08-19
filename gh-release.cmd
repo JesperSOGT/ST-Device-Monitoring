@@ -83,8 +83,21 @@ dir /b artifacts
 
 echo.
 echo === 6/8 Commit, tag and push ===
+REM commit-message.txt is used as the commit text when it exists, so the description written
+REM together with the code ends up in the history. It is git-ignored and removed after the commit.
 git add -A
-git diff --cached --quiet || git commit -m "Release %TAG%"
+git diff --cached --quiet
+if errorlevel 1 (
+  if exist "commit-message.txt" (
+    echo Using commit-message.txt as the commit text.
+    git commit -F "commit-message.txt"
+    if not errorlevel 1 del "commit-message.txt"
+  ) else (
+    git commit -m "Release %TAG%"
+  )
+) else (
+  echo Nothing to commit - the working tree is clean.
+)
 git push origin %BRANCH%
 if errorlevel 1 (echo PUSH FAILED - fix it and run again. & pause & exit /b 1)
 git tag -f %TAG%

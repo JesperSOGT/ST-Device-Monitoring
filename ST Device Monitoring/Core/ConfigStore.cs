@@ -30,6 +30,11 @@ public static class ConfigStore
             var json = File.ReadAllText(ConfigPath);
             var cfg = JsonSerializer.Deserialize<AppConfig>(json, Options) ?? new AppConfig();
             cfg.Devices ??= new List<DeviceConfig>();
+            cfg.Schedules ??= new List<GroupSchedule>();
+            cfg.Schedules.RemoveAll(s => string.IsNullOrWhiteSpace(s.Group));
+            cfg.Updates ??= new UpdateSettings();
+            if (string.IsNullOrWhiteSpace(cfg.Updates.RepositoryOwner)) cfg.Updates.RepositoryOwner = AppInfo.RepositoryOwner;
+            if (string.IsNullOrWhiteSpace(cfg.Updates.RepositoryName)) cfg.Updates.RepositoryName = AppInfo.RepositoryName;
 
             foreach (var d in cfg.Devices)
             {

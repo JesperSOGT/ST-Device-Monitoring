@@ -157,6 +157,13 @@ public sealed class AppConfig
 {
     public List<DeviceConfig> Devices { get; set; } = new();
 
+    /// <summary>
+    /// Per-group schedules. A group listed here is only checked in short runs - "every 30 minutes,
+    /// check for 2 minutes, 07:00-17:00 on weekdays" - instead of continuously. Groups that are not
+    /// listed, or whose schedule is switched off, are checked all the time as before.
+    /// </summary>
+    public List<GroupSchedule> Schedules { get; set; } = new();
+
     /// <summary>Folder for the CSV logs. A relative path is resolved against the program folder.</summary>
     public string LogDirectory { get; set; } = "Logs";
 
@@ -192,6 +199,29 @@ public sealed class AppConfig
 
     public AlertSettings Alerts { get; set; } = new();
     public UiSettings Ui { get; set; } = new();
+    public UpdateSettings Updates { get; set; } = new();
+}
+
+/// <summary>How the program looks for new versions on GitHub.</summary>
+public sealed class UpdateSettings
+{
+    /// <summary>Ask GitHub for the newest release when the program starts. Nothing is installed by itself.</summary>
+    public bool CheckOnStartup { get; set; } = true;
+
+    /// <summary>Also offer releases marked as pre-release.</summary>
+    public bool IncludePreReleases { get; set; } = false;
+
+    /// <summary>GitHub account the releases are published under.</summary>
+    public string RepositoryOwner { get; set; } = AppInfo.RepositoryOwner;
+
+    /// <summary>GitHub repository name.</summary>
+    public string RepositoryName { get; set; } = AppInfo.RepositoryName;
+
+    /// <summary>A version the user chose to skip - it is not announced again.</summary>
+    public string SkipVersion { get; set; } = string.Empty;
+
+    /// <summary>When the last check was made. Only shown to the user.</summary>
+    public DateTime? LastChecked { get; set; }
 }
 
 /// <summary>Notification settings.</summary>

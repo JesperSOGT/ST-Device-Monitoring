@@ -10,12 +10,19 @@
     <UseWindowsForms>true</UseWindowsForms>
     <StartupObject>ST_Device_Monitoring.Program</StartupObject>
     <ApplicationIcon>Assets\appicon.ico</ApplicationIcon>
-    <Version>1.28.1</Version>
+    <Version>1.30.0</Version>
     <Product>ST Device Monitoring</Product>
     <Authors>Jesper Bødewadt Møller</Authors>
     <Copyright>Developed by Jesper Bødewadt Møller. All rights reserved.</Copyright>
     <NoWarn>SYSLIB0014</NoWarn>
+    <!-- publish.cmd sets this to selfcontained or framework-dependent. The updater reads it back
+         at runtime so it downloads the same kind of exe as the one that is installed. -->
+    <BuildVariant Condition="'$(BuildVariant)' == ''">development</BuildVariant>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="BuildVariant" Value="$(BuildVariant)" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- UseWindowsForms adds global usings for System.Windows.Forms and System.Drawing, which

@@ -105,6 +105,13 @@ the first time it is run, and reads the version number from the project file.
   *Paused*, one `PAUSED` line in the log) instead of all failing at once, and they resume with a
   `RESUMED` line as soon as the master answers again. No alarms, no failure counts and no log
   noise for devices that are only unreachable because the uplink is down.
+- **Group schedules (periodic checking)**: instead of watching a group continuously it can run in
+  short bursts - *every 30 minutes, check for 2 minutes* - with an optional time window and set of
+  weekdays (*07:00-17:00, Mon-Fri*; an end time before the start time crosses midnight). Between
+  two runs the whole group is paused: nothing is sent, no failures are counted, no alarms are
+  raised and the log stays quiet apart from one line per run boundary. The runs are anchored to the
+  start of the window, so they always land on the same clock times and survive a restart. Groups
+  without a schedule keep running continuously, and applying a schedule never restarts a check loop.
 - **Filtering**: search box (name/host/group), group drop-down and an "only failures" view.
 - **Alerts**: tray icon with balloon notifications, sound on failure, SMTP e-mail and webhook
   (JSON POST for Teams/Slack/ticket systems), with per-device throttling.
@@ -117,6 +124,10 @@ the first time it is run, and reads the version number from the project file.
   treated as a hostname. Hostnames are checked for legal characters and label lengths. The same
   check runs on CSV import and on the scan range.
 - **Duplicate check** on host (and port) plus a warning when the timeout is longer than the interval.
+- **Updates itself from GitHub**: checks the releases in this repository, shows what is in the new
+  version and replaces its own exe on request. The download is verified (size and SHA-256) before
+  anything is touched, the replaced version is kept as `.exe.previous`, and the Windows service is
+  stopped and started again when it is installed. Nothing is installed without a confirmation.
 - **Run as a Windows service** or as a normal application - selectable in Settings.
 - **About dialog** with logo, version and copyright. Version and build date live in `AppInfo.cs`.
 
@@ -140,6 +151,32 @@ Notes:
   running as LocalSystem cannot decrypt it - use a relay without authentication, or set the service
   to log on as the same user.
 - The service writes start/stop lines to `service.log` next to the executable.
+
+## Updating from GitHub
+
+The application installs new versions over itself. Press **Updates…** in the toolbar, or open
+**Settings → Updates**.
+
+- The check reads the newest release from the public GitHub API - no account, no token and nothing
+  about the machine is sent. With *Look for a new version when the program starts* it runs once a
+  few seconds after start and only lights up a note in the status bar; monitoring is never
+  interrupted by itself.
+- A release carries two exe files. `publish.cmd` stamps `BuildVariant` into the assembly, so the
+  running copy knows whether it is the self-contained or the framework-dependent build and offers
+  the matching file. A build straight from Visual Studio is offered the self-contained one.
+- The file is downloaded to `%TEMP%\ST Device Monitoring\update` and verified against the size and
+  the SHA-256 digest GitHub reports before anything on disk is touched.
+- A running exe holds itself locked, so a small script does the swap: it retries the copy until the
+  program has closed (up to 90 seconds), starts it again and deletes itself. If it cannot replace
+  the file it says where the download is instead of leaving a half-finished install.
+- The replaced version is kept next to the program as `ST Device Monitoring.exe.previous` - rename
+  it back to roll a bad version back.
+- When the Windows service is installed it is stopped before the swap and started again afterwards,
+  which requires administrator rights (UAC prompt). The same applies when the program sits in a
+  folder the user cannot write to.
+- *Skip this version* silences one release; a later one is still announced.
+
+`devices.json`, the log files and every setting survive an update untouched.
 
 ## Log files, size limit and rotation
 
@@ -260,6 +297,18 @@ network equipment may block ICMP - use the TCP check for those devices.
       "Enabled": true
     }
   ],
+  "Schedules": [
+    {
+      "Group": "Remote site",
+      "Enabled": true,
+      "Every": 1,
+      "Unit": "Hours",
+      "RunSeconds": 120,
+      "ActiveFrom": "07:00",
+      "ActiveTo": "17:00",
+      "Days": "Weekdays"
+    }
+  ],
   "LogDirectory": "Logs",
   "LogAllPings": true,
   "UiRefreshMs": 250,
@@ -268,8 +317,15 @@ network equipment may block ICMP - use the TCP check for those devices.
   "AutoStart": false,
   "WriteDailySummary": true,
   "Alerts": { "BalloonEnabled": true, "SoundEnabled": true, "EmailEnabled": false, "WebhookEnabled": false },
-  "Ui": { "ShowTrayIcon": true, "MinimizeToTray": true, "CloseToTray": false, "StartMinimized": false }
+  "Ui": { "ShowTrayIcon": true, "MinimizeToTray": true, "CloseToTray": false, "StartMinimized": false },
+  "Updates": { "CheckOnStartup": true, "IncludePreReleases": false,
+               "RepositoryOwner": "JesperSOGT", "RepositoryName": "ST-Device-Monitoring" }
 }
 ```
 
-`Mode` is `Icmp` or `TcpPort`. `LogDirectory` may be absolute, e.g. `D:\\PingLogs`.
+`Mode` is `Icmp`, `TcpPort` or `Snmp`. `LogDirectory` may be absolute, e.g. `D:\\PingLogs`.
+
+In `Schedules`, `Unit` is `Minutes` or `Hours`, and `Days` is a comma separated list
+(`Monday, Wednesday`) or one of `Weekdays`, `Weekend` and `All`. Identical `ActiveFrom` and
+`ActiveTo` mean all day; an end time earlier than the start time crosses midnight. A group that is
+not listed is checked continuously.

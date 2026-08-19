@@ -15,6 +15,9 @@ public partial class SettingsWindow : Window
     /// <summary>True when the log folder or retention changed and a restart is recommended.</summary>
     public bool RestartRecommended { get; private set; }
 
+    /// <summary>True when an update was started from here and the program must close now.</summary>
+    public bool RestartForUpdate { get; private set; }
+
     public SettingsWindow(AppConfig config, AlertDispatcher alerts)
     {
         InitializeComponent();
@@ -68,6 +71,66 @@ public partial class SettingsWindow : Window
         RotationNoneBox.IsChecked = config.LogRotation == LogRotationMode.None;
         RotationZipBox.IsChecked = config.LogRotation == LogRotationMode.RotateAndZip;
         RotationRingBox.IsChecked = config.LogRotation == LogRotationMode.RingBuffer;
+
+        // Updates
+        var up = config.Updates;
+        UpdateCheckStartupBox.IsChecked = up.CheckOnStartup;
+        UpdatePreReleaseBox.IsChecked = up.IncludePreReleases;
+        UpdateOwnerBox.Text = up.RepositoryOwner;
+        UpdateRepoBox.Text = up.RepositoryName;
+        ShowUpdateStatus();
+    }
+
+    // ---------- Updates ----------
+
+    private void ShowUpdateStatus()
+    {
+        var up = _config.Updates;
+        var text = $"Installed version: v{AppInfo.Version} (built {AppInfo.BuildDate}).";
+        text += up.LastChecked == null
+            ? " Never checked."
+            : $" Last checked {up.LastChecked:dd-MM-yyyy HH:mm}.";
+        if (!string.IsNullOrWhiteSpace(up.SkipVersion))
+            text += $" {up.SkipVersion} is being skipped.";
+        UpdateStatusText.Text = text;
+    }
+
+    /// <summary>Applies the repository fields before checking, so a corrected name is used at once.</summary>
+    private void ApplyUpdateSettings()
+    {
+        var up = _config.Updates;
+        up.CheckOnStartup = UpdateCheckStartupBox.IsChecked == true;
+        up.IncludePreReleases = UpdatePreReleaseBox.IsChecked == true;
+
+        var owner = UpdateOwnerBox.Text.Trim();
+        var repo = UpdateRepoBox.Text.Trim();
+        up.RepositoryOwner = string.IsNullOrWhiteSpace(owner) ? AppInfo.RepositoryOwner : owner;
+        up.RepositoryName = string.IsNullOrWhiteSpace(repo) ? AppInfo.RepositoryName : repo;
+    }
+
+    private void CheckUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyUpdateSettings();
+        var dialog = new UpdateWindow(_config) { Owner = this };
+        dialog.ShowDialog();
+
+        if (dialog.RestartRequested)
+        {
+            // The update script is waiting for the exe to be released. The main window has to do
+            // the closing - calling Shutdown from here would run into "close to tray" and the
+            // program would only hide, keeping its own exe locked.
+            RestartForUpdate = true;
+            DialogResult = true;
+            return;
+        }
+
+        ShowUpdateStatus();
+    }
+
+    private void ClearSkip_Click(object sender, RoutedEventArgs e)
+    {
+        _config.Updates.SkipVersion = string.Empty;
+        ShowUpdateStatus();
     }
 
     // ---------- Service ----------
@@ -164,6 +227,7 @@ public partial class SettingsWindow : Window
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         ApplyAlertSettings();
+        ApplyUpdateSettings();
 
         var u = _config.Ui;
         u.ShowTrayIcon = TrayIconBox.IsChecked == true;

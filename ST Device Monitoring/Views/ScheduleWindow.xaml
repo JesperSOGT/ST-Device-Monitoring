@@ -1,0 +1,145 @@
+<Window x:Class="ST_Device_Monitoring.Views.ScheduleWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Group schedules" Height="640" Width="900" MinWidth="760" MinHeight="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Icon="pack://application:,,,/Assets/appicon.png">
+    <DockPanel Margin="16">
+
+        <Border DockPanel.Dock="Top" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4"
+                Padding="12" Margin="0,0,0,10" Background="#FAFBFC">
+            <StackPanel>
+                <TextBlock TextWrapping="Wrap" Foreground="#444"
+                           Text="A schedule turns continuous monitoring of a group into short runs - for example every 30 minutes, check for 2 minutes. Between two runs the devices in the group are not checked at all: no failures are counted, no alarms are raised and nothing is written to the log except one line for the pause and one for the next run."/>
+                <TextBlock TextWrapping="Wrap" Foreground="#666" FontSize="11" Margin="0,6,0,0"
+                           Text="The runs are anchored to the start of the active window, so they always land on the same clock times (07:00, 07:30, 08:00 …) and stay on those times after a restart. Groups without a schedule keep running continuously, exactly as before."/>
+            </StackPanel>
+        </Border>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <TextBlock x:Name="ErrorText" Foreground="#C62828" TextWrapping="Wrap" MaxWidth="520"
+                       VerticalAlignment="Center" Margin="0,0,16,0"/>
+            <Button Content="Cancel" Width="90" Height="28" Margin="0,0,8,0" IsCancel="True"/>
+            <Button Content="Save" Width="90" Height="28" IsDefault="True" Click="Save_Click"/>
+        </StackPanel>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="270"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Groups -->
+            <DockPanel Grid.Column="0" Margin="0,0,14,0">
+                <TextBlock DockPanel.Dock="Top" Text="Groups" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock DockPanel.Dock="Bottom" x:Name="NoGroupsText" TextWrapping="Wrap" FontSize="11"
+                           Foreground="#B26A00" Margin="0,6,0,0"/>
+                <ListBox x:Name="GroupList" SelectionChanged="Group_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="2,3">
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding SummaryText}" FontSize="11" Foreground="#666"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <!-- Settings for the selected group -->
+            <Border Grid.Column="1" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14">
+                <StackPanel x:Name="EditPanel">
+                    <TextBlock x:Name="GroupHeader" Text="Select a group" FontWeight="SemiBold" FontSize="14"/>
+                    <TextBlock x:Name="GroupSubHeader" Foreground="#666" FontSize="11" Margin="0,2,0,10"/>
+
+                    <CheckBox x:Name="EnabledBox" Content="Use a schedule for this group"
+                              Checked="Setting_Changed" Unchecked="Setting_Changed"
+                              ToolTip="Off = the group is checked continuously with each device's own interval"/>
+                    <TextBlock Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="20,2,0,10"
+                               Text="Off means the group is checked all the time, exactly as before."/>
+
+                    <StackPanel x:Name="FieldsPanel">
+                        <!-- Interval -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="Run every" VerticalAlignment="Center" Width="110"/>
+                            <TextBox x:Name="EveryBox" Width="70" Padding="4,3" TextChanged="Text_Changed"/>
+                            <ComboBox x:Name="UnitBox" Width="100" Margin="8,0,0,0" Padding="4,3"
+                                      SelectionChanged="Unit_Changed">
+                                <ComboBoxItem Content="minutes"/>
+                                <ComboBoxItem Content="hours"/>
+                            </ComboBox>
+                            <Button Content="15 min" Padding="8,2" Margin="12,0,0,0" Click="Quick15_Click"/>
+                            <Button Content="1 hour" Padding="8,2" Margin="6,0,0,0" Click="Quick1h_Click"/>
+                            <Button Content="24 hours" Padding="8,2" Margin="6,0,0,0" Click="Quick24h_Click"/>
+                        </StackPanel>
+
+                        <!-- Run length -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="Each run lasts" VerticalAlignment="Center" Width="110"/>
+                            <TextBox x:Name="RunBox" Width="70" Padding="4,3" TextChanged="Text_Changed"/>
+                            <TextBlock Text="seconds" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                            <Button Content="30 s" Padding="8,2" Margin="12,0,0,0" Click="Run30_Click"/>
+                            <Button Content="2 min" Padding="8,2" Margin="6,0,0,0" Click="Run120_Click"/>
+                            <Button Content="5 min" Padding="8,2" Margin="6,0,0,0" Click="Run300_Click"/>
+                        </StackPanel>
+                        <TextBlock Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="110,0,0,12"
+                                   Text="During a run the devices are checked with their own interval and timeout, so a two minute run at 1000 ms gives about 120 measurements per device."/>
+
+                        <!-- Active window -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="Only between" VerticalAlignment="Center" Width="110"/>
+                            <TextBox x:Name="FromBox" Width="70" Padding="4,3" TextChanged="Text_Changed"/>
+                            <TextBlock Text="and" VerticalAlignment="Center" Margin="8,0"/>
+                            <TextBox x:Name="ToBox" Width="70" Padding="4,3" TextChanged="Text_Changed"/>
+                            <Button Content="All day" Padding="8,2" Margin="12,0,0,0" Click="AllDay_Click"/>
+                            <Button Content="07:00-17:00" Padding="8,2" Margin="6,0,0,0" Click="WorkHours_Click"/>
+                        </StackPanel>
+                        <TextBlock Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="110,0,0,12"
+                                   Text="Write the times as HH:mm. Two identical times mean all day. An end time earlier than the start time means the window crosses midnight, for example 22:00 to 06:00."/>
+
+                        <!-- Days -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="On these days" VerticalAlignment="Center" Width="110"/>
+                            <CheckBox x:Name="MonBox" Content="Mon" Margin="0,0,10,0" VerticalAlignment="Center"
+                                      Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+                            <CheckBox x:Name="TueBox" Content="Tue" Margin="0,0,10,0" VerticalAlignment="Center"
+                                      Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+                            <CheckBox x:Name="WedBox" Content="Wed" Margin="0,0,10,0" VerticalAlignment="Center"
+                                      Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+                            <CheckBox x:Name="ThuBox" Content="Thu" Margin="0,0,10,0" VerticalAlignment="Center"
+                                      Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+                            <CheckBox x:Name="FriBox" Content="Fri" Margin="0,0,10,0" VerticalAlignment="Center"
+                                      Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+                            <CheckBox x:Name="SatBox" Content="Sat" Margin="0,0,10,0" VerticalAlignment="Center"
+                                      Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+                            <CheckBox x:Name="SunBox" Content="Sun" Margin="0,0,10,0" VerticalAlignment="Center"
+                                      Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="110,0,0,14">
+                            <Button Content="Every day" Padding="8,2" Click="EveryDay_Click"/>
+                            <Button Content="Mon-Fri" Padding="8,2" Margin="6,0,0,0" Click="Weekdays_Click"/>
+                        </StackPanel>
+
+                        <!-- Live preview -->
+                        <Border BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="10"
+                                Background="#F7FAFC">
+                            <StackPanel>
+                                <TextBlock Text="Result" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="PreviewText" TextWrapping="Wrap" Foreground="#444"/>
+                                <TextBlock x:Name="PreviewNextText" TextWrapping="Wrap" Foreground="#456C8C"
+                                           Margin="0,4,0,0"/>
+                                <TextBlock x:Name="PreviewWarnText" TextWrapping="Wrap" Foreground="#B26A00"
+                                           FontSize="11" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Button Content="Copy this schedule to all groups" Padding="10,4" Margin="0,12,0,0"
+                                HorizontalAlignment="Left" Click="CopyToAll_Click"
+                                ToolTip="Gives every group in the list the same schedule as this one"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

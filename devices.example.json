@@ -19,6 +19,7 @@
       "Name": "Switch technical room",
       "Host": "192.168.1.1",
       "Group": "Quay 3",
+      "IsGroupMaster": true,
       "Mode": "Icmp",
       "Port": 502,
       "IntervalMs": 1000,
@@ -27,6 +28,31 @@
       "FailThreshold": 2,
       "MaxLoggedFailures": 5,
       "Enabled": true
+    },
+    {
+      "Id": "6f9b1f6e-1f1a-4f8f-9f1e-000000000003",
+      "Name": "Weather station",
+      "Host": "10.20.30.40",
+      "Group": "Remote site",
+      "Mode": "Icmp",
+      "IntervalMs": 1000,
+      "DownIntervalMs": 2000,
+      "TimeoutMs": 1000,
+      "FailThreshold": 3,
+      "MaxLoggedFailures": 5,
+      "Enabled": true
+    }
+  ],
+  "Schedules": [
+    {
+      "Group": "Remote site",
+      "Enabled": true,
+      "Every": 1,
+      "Unit": "Hours",
+      "RunSeconds": 120,
+      "ActiveFrom": "07:00",
+      "ActiveTo": "17:00",
+      "Days": "Weekdays"
     }
   ],
   "LogDirectory": "Logs",
@@ -59,5 +85,12 @@
     "CloseToTray": false,
     "StartWithWindows": false,
     "StartMinimized": false
+  },
+  "Updates": {
+    "CheckOnStartup": true,
+    "IncludePreReleases": false,
+    "RepositoryOwner": "JesperSOGT",
+    "RepositoryName": "ST-Device-Monitoring",
+    "SkipVersion": ""
   }
 }

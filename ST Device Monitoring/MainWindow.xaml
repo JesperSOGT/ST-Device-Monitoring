@@ -47,6 +47,8 @@
                 <Button Click="Export_Click" Padding="10,4" ToolTip="Export the device list to CSV">Export</Button>
                 <Separator/>
                 <Button Click="ToggleEnabled_Click" Padding="10,4" ToolTip="Enable/disable the selected device">Enable/disable</Button>
+                <Button Click="Schedules_Click" Padding="10,4"
+                        ToolTip="Let a group run on a schedule - for example every hour for two minutes instead of continuously">Schedules…</Button>
                 <Button Click="Reset_Click" Padding="10,4" ToolTip="Reset all counters">Reset counters</Button>
                 <Separator/>
                 <Button Click="OpenLogFolder_Click" Padding="10,4">Log folder</Button>
@@ -72,6 +74,8 @@
                 <Separator/>
                 <Button Click="Settings_Click" Padding="10,4">Settings…</Button>
                 <Button Click="Help_Click" Padding="10,4" ToolTip="How the functions work (F1)">Help</Button>
+                <Button Click="Update_Click" Padding="10,4"
+                        ToolTip="Check GitHub for a newer version and install it">Updates…</Button>
                 <Button Click="About_Click" Padding="10,4">About</Button>
             </ToolBar>
         </ToolBarTray>
@@ -84,6 +88,12 @@
             <Separator/>
             <StatusBarItem>
                 <TextBlock x:Name="LogText" Text=""/>
+            </StatusBarItem>
+            <StatusBarItem>
+                <Button x:Name="UpdateBanner" Visibility="Collapsed" Click="Update_Click"
+                        Background="#FFF3CD" BorderBrush="#E0B44A" BorderThickness="1"
+                        Foreground="#7A5300" Padding="10,1" Cursor="Hand"
+                        ToolTip="A newer version has been published on GitHub - click to see what is in it and install it"/>
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
                 <TextBlock x:Name="ClockText" Foreground="#666"/>
@@ -144,9 +154,9 @@
                             <TextBlock x:Name="TileSuppressed" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="#E65100"/>
                         </StackPanel>
                     </Border>
-                    <Border Background="White" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14,6" ToolTip="Devices that are not being checked at all because their group master (the uplink) is down.">
+                    <Border Background="White" BorderBrush="#DDE3EA" BorderThickness="1" CornerRadius="4" Padding="14,6" ToolTip="Devices that are not being checked at all right now - either because their group master (the uplink) is down, or because their group is on a schedule and is between two runs.">
                         <StackPanel>
-                            <TextBlock Text="PAUSED (UPLINK)" FontSize="10" Foreground="#78838F"/>
+                            <TextBlock Text="PAUSED" FontSize="10" Foreground="#78838F"/>
                             <TextBlock x:Name="TileBlocked" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="#456C8C"/>
                         </StackPanel>
                     </Border>
@@ -191,7 +201,7 @@
                             <TextBlock Text="Status">
                                 <TextBlock.ToolTip>
                                     <TextBlock MaxWidth="400" TextWrapping="Wrap"
-                                               Text="Current state, based on failures in a row - not on response time.&#10;&#10;OK = last check answered.&#10;Unstable = 1 or more failures in a row, but fewer than the alarm threshold.&#10;FAIL = failures in a row have reached the threshold.&#10;Paused = the group master is down, so this device is not checked.&#10;Stopped / Disabled = monitoring is not running for this device."/>
+                                               Text="Current state, based on failures in a row - not on response time.&#10;&#10;OK = last check answered.&#10;Unstable = 1 or more failures in a row, but fewer than the alarm threshold.&#10;FAIL = failures in a row have reached the threshold.&#10;Paused = the device is not being checked: either the group master is down, or the group is on a schedule and is between two runs. The reason is shown in the Error text column.&#10;Stopped / Disabled = monitoring is not running for this device."/>
                                 </TextBlock.ToolTip>
                             </TextBlock>
                         </DataGridTemplateColumn.Header>
@@ -237,6 +247,18 @@
                                 <TextBlock.ToolTip>
                                     <TextBlock MaxWidth="400" TextWrapping="Wrap"
                                                Text="Group / site, used for filtering.&#10;&#10;A star and 'master' marks the group master - the uplink. While the master is down, the rest of the group is paused instead of all reporting failures."/>
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding ScheduleText}" Width="Auto" MinWidth="90"
+                                        ElementStyle="{StaticResource TextCell}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="Schedule">
+                                <TextBlock.ToolTip>
+                                    <TextBlock MaxWidth="420" TextWrapping="Wrap"
+                                               Text="The schedule of the device's group, set under &quot;Schedules…&quot;.&#10;&#10;Continuous = the device is checked all the time with its own interval.&#10;Otherwise: how often the group runs, how long each run lasts, and the time window and days it is allowed to run in - for example 'every 30 min · runs 2 min · 07:00-17:00 · Mon-Fri'.&#10;&#10;Between two runs the whole group is paused: nothing is checked, no failures are counted and no alarms are raised."/>
                                 </TextBlock.ToolTip>
                             </TextBlock>
                         </DataGridTextColumn.Header>

@@ -7,6 +7,24 @@ using ST_Device_Monitoring.Models;
 
 namespace ST_Device_Monitoring.Core;
 
+/// <summary>Answer from the gate that decides whether a device may be checked right now.</summary>
+public readonly struct GateResult
+{
+    /// <summary>True when the device may be checked.</summary>
+    public bool Open { get; init; }
+
+    /// <summary>Why checking is paused. Only set when <see cref="Open"/> is false.</summary>
+    public string? Reason { get; init; }
+
+    /// <summary>True when the pause comes from the group schedule rather than the group master.</summary>
+    public bool FromSchedule { get; init; }
+
+    public static GateResult Allow => new() { Open = true };
+
+    public static GateResult Block(string reason, bool fromSchedule)
+        => new() { Open = false, Reason = reason, FromSchedule = fromSchedule };
+}
+
 /// <summary>Raised when a device goes down or comes back up.</summary>
 public readonly struct DeviceAlert
 {
@@ -59,25 +77,33 @@ public sealed class DeviceMonitor : IDisposable
     private volatile bool _loggingSuppressed;
     private volatile bool _descriptionChecked;
     private volatile bool _blocked;
+    private volatile bool _blockedBySchedule;
+    private volatile string? _blockReason;
     private volatile bool _firstSuccessLogged;
 
     public DeviceConfig Config { get; private set; }
 
     /// <summary>
-    /// Optional gate from the group master. When it returns false the device is not checked at
-    /// all - used when the group's uplink is down, so the devices behind it do not produce a
-    /// storm of failures and alarms.
+    /// Optional gate deciding whether the device may be checked right now. Two things use it: the
+    /// group master (the devices behind a dead uplink are paused instead of producing a storm of
+    /// failures and alarms) and the group schedule (the group is only checked in short runs).
     /// </summary>
-    public Func<bool>? CanCheck { get; set; }
+    public Func<GateResult>? CheckGate { get; set; }
 
     /// <summary>Name of the master that controls this device (only used for logging/UI).</summary>
     public string? GateSourceName { get; set; }
 
+    /// <summary>The schedule that governs this device's group, if any. Used by the UI only.</summary>
+    public GroupSchedule? Schedule { get; set; }
+
     /// <summary>True when the device is currently counted as down (past its fail threshold).</summary>
     public bool IsDown => _running && _inOutage;
 
-    /// <summary>True when checking is paused because the group master is down.</summary>
+    /// <summary>True when checking is paused - by the group master or by the group schedule.</summary>
     public bool IsBlocked => _blocked;
+
+    /// <summary>Why checking is paused, or null.</summary>
+    public string? BlockReason => _blockReason;
 
     /// <summary>Raised from the check thread when the device goes down or recovers.</summary>
     public event Action<DeviceAlert>? Alert;
@@ -111,6 +137,8 @@ public sealed class DeviceMonitor : IDisposable
     {
         if (_running || !Config.Enabled) return;
         _blocked = false;
+        _blockedBySchedule = false;
+        _blockReason = null;
         _firstSuccessLogged = false;
         _cts = new CancellationTokenSource();
         _running = true;
@@ -150,13 +178,18 @@ public sealed class DeviceMonitor : IDisposable
             {
                 sw.Restart();
 
-                // The group master decides whether the devices behind it are checked at all.
-                var gate = CanCheck;
-                if (gate != null && !gate())
+                // The group master and the group schedule decide whether this device is checked
+                // at all right now.
+                var gate = CheckGate;
+                if (gate != null)
                 {
-                    EnterBlocked();
-                    await Task.Delay(Math.Clamp(Config.IntervalMs, 250, 2000), ct).ConfigureAwait(false);
-                    continue;
+                    var decision = gate();
+                    if (!decision.Open)
+                    {
+                        EnterBlocked(decision.Reason, decision.FromSchedule);
+                        await Task.Delay(Math.Clamp(Config.IntervalMs, 250, 1000), ct).ConfigureAwait(false);
+                        continue;
+                    }
                 }
                 if (_blocked) LeaveBlocked();
 
@@ -282,9 +315,15 @@ public sealed class DeviceMonitor : IDisposable
     /// raised for something that is only unreachable because the uplink is down) and one PAUSED
     /// line is written to the log.
     /// </summary>
-    private void EnterBlocked()
+    private void EnterBlocked(string? reason, bool fromSchedule)
     {
-        if (_blocked) return;
+        // The reason is refreshed on every pass so the countdown to the next run stays current
+        // in the list, but only the first pass writes to the log.
+        var alreadyBlocked = _blocked;
+        _blockReason = reason;
+        _blockedBySchedule = fromSchedule;
+        if (alreadyBlocked) return;
+
         _blocked = true;
 
         Interlocked.Exchange(ref _consecutiveFails, 0);
@@ -299,10 +338,8 @@ public sealed class DeviceMonitor : IDisposable
             DeviceName = Config.Name,
             Host = Config.Host,
             Event = PingEvent.Paused,
-            Status = "Paused",
-            Info = GateSourceName is { Length: > 0 } master
-                ? $"Group master \"{master}\" is down - checking paused"
-                : "Group master is down - checking paused",
+            Status = fromSchedule ? "Scheduled pause" : "Paused",
+            Info = reason ?? "Checking paused",
             ConsecutiveFails = 0
         });
     }
@@ -310,7 +347,10 @@ public sealed class DeviceMonitor : IDisposable
     private void LeaveBlocked()
     {
         if (!_blocked) return;
+        var wasSchedule = _blockedBySchedule;
         _blocked = false;
+        _blockedBySchedule = false;
+        _blockReason = null;
 
         _logger.Log(new LogRecord
         {
@@ -318,10 +358,12 @@ public sealed class DeviceMonitor : IDisposable
             DeviceName = Config.Name,
             Host = Config.Host,
             Event = PingEvent.Resumed,
-            Status = "Resumed",
-            Info = GateSourceName is { Length: > 0 } master
-                ? $"Group master \"{master}\" answers again - checking resumed"
-                : "Group master answers again - checking resumed",
+            Status = wasSchedule ? "Scheduled run" : "Resumed",
+            Info = wasSchedule
+                ? $"Scheduled run started for group \"{Config.Group}\" - checking resumed"
+                : GateSourceName is { Length: > 0 } master
+                    ? $"Group master \"{master}\" answers again - checking resumed"
+                    : "Checking resumed",
             ConsecutiveFails = 0
         });
     }
@@ -659,7 +701,9 @@ public sealed class DeviceMonitor : IDisposable
             SuppressedEntries = Interlocked.Read(ref _suppressedEntries),
             Rolling = _rolling.GetStats(now),
             Blocked = _blocked,
-            GateSource = GateSourceName
+            GateSource = GateSourceName,
+            BlockReason = _blockReason,
+            BlockedBySchedule = _blockedBySchedule
         };
     }
 
@@ -719,6 +763,8 @@ public sealed class DeviceMonitor : IDisposable
         _inOutage = false;
         _loggingSuppressed = false;
         _blocked = false;
+        _blockedBySchedule = false;
+        _blockReason = null;
         _firstSuccessLogged = false;
         _rolling.Reset();
         _daily.Reset();

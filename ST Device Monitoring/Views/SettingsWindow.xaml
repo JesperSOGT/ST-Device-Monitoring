@@ -167,6 +167,51 @@
                                Text="The file keeps its name and always holds the newest entries; a TRIMMED line marks where older entries were removed. Nothing is archived - use zip mode if the history must be kept."/>
                 </StackPanel>
             </TabItem>
+
+            <!-- Updates -->
+            <TabItem Header="Updates">
+                <StackPanel Margin="14">
+                    <TextBlock Text="New versions from GitHub" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="#666" FontSize="11" Margin="0,0,0,10"
+                               Text="The program can look at the releases published on GitHub and install a newer exe over itself. Only the release list is read - nothing about this machine is sent, and nothing is installed without you pressing the button."/>
+
+                    <CheckBox x:Name="UpdateCheckStartupBox" Content="Look for a new version when the program starts" Margin="0,3"/>
+                    <TextBlock Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="22,0,0,8"
+                               Text="One request to github.com a few seconds after start. If a newer release exists, a yellow note appears in the status bar - monitoring is never interrupted by itself."/>
+
+                    <CheckBox x:Name="UpdatePreReleaseBox" Content="Also offer versions marked as pre-release" Margin="0,3"/>
+                    <TextBlock Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="22,0,0,10"
+                               Text="Off means only finished releases are offered."/>
+
+                    <TextBlock Text="Repository" FontWeight="SemiBold" Margin="0,10,0,6"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="Owner" VerticalAlignment="Center" Margin="0,0,8,6"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" x:Name="UpdateOwnerBox" Padding="4,3" Margin="0,0,0,6"/>
+                        <TextBlock Grid.Row="1" Text="Repository" VerticalAlignment="Center" Margin="0,0,8,6"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="UpdateRepoBox" Padding="4,3" Margin="0,0,0,6"/>
+                    </Grid>
+                    <TextBlock Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10"
+                               Text="The repository has to be public for the download to work without a GitHub account."/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <Button Content="Check for updates now" Padding="12,4" Click="CheckUpdate_Click"/>
+                        <Button Content="Clear skipped version" Padding="12,4" Margin="8,0,0,0" Click="ClearSkip_Click"
+                                ToolTip="Announce a version again that you chose to skip"/>
+                    </StackPanel>
+                    <TextBlock x:Name="UpdateStatusText" Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0"/>
+
+                    <TextBlock TextWrapping="Wrap" Foreground="#666" FontSize="11" Margin="0,14,0,0"
+                               Text="How the swap works: the new exe is downloaded to the temporary folder and its size and checksum are verified. A small script then replaces the program file as soon as the program closes, and starts it again. The version that was replaced is kept next to the program as 'ST Device Monitoring.exe.previous', so it can be put back by hand. If the Windows service is installed it is stopped and started again, which needs administrator rights."/>
+                </StackPanel>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>
