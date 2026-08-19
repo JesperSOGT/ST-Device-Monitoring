@@ -73,6 +73,10 @@ publish.cmd
 `publish.cmd` writes both variants to `publish\`. Pushing a tag (`git tag v1.29.0 && git push origin v1.29.0`)
 builds them on GitHub and publishes a release automatically.
 
+`gh-release.cmd build` does the whole thing from one command: builds, commits, pushes, tags and
+publishes the GitHub release with both exe files attached. It installs the GitHub CLI and signs in
+the first time it is run, and reads the version number from the project file.
+
 ## Features
 
 - **Devices** with name, IP address/hostname, group, check type, interval, down interval, timeout,
